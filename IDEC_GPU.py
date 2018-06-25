@@ -30,9 +30,11 @@ import tables
 from DEC import cluster_acc, ClusteringLayer, autoencoder
 import loader_v2
 
+# python /mnt/Larvae/IDEC_GPU.py --data=/pasteur/projets/policy02/Larva-Screen/screens/t15 --lines=gmr_72f11_ae_01@uas_chrimson_venus_x_0070\20141218_103213 --save_dir=/pasteur/homes/nskatchk/test --n_gpus=8
 # python IDEC_GPU.py --dataset=custom --data="D:\Nicolas\Python projects\IDEC\results\data\dataset.hdf5" --save_dir="D:\Nicolas\Python projects\IDEC\results"
 # python IDEC_GPU.py --data=D:\Nicolas\samples_screens_t15 --save_dir="D:\Nicolas\Python projects\IDEC\results" --lines=gmr_72f11
 
+# GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s#n#n#n@100/20140818_130752
 
 class IDEC(object):
     def __init__(self,

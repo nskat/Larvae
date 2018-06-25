@@ -160,18 +160,18 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
         if lines:
             if any(s in dirs for s in lines):
                 if labels == 'normal':
-                    allFiles = glob.glob(dirs + r"\State_Amplitude_t15*.txt")
+                    allFiles = glob.glob(dirs + r"/State_Amplitude_t15*.txt")
                 elif labels == 'large':
-                    allFiles = glob.glob(dirs + r"\State_Amplitude_large_state_*.txt")
+                    allFiles = glob.glob(dirs + r"/State_Amplitude_large_state_*.txt")
                 elif labels == 'strong_weak':
-                    allFiles = glob.glob(dirs + r"\State_Amplitude_state_strong_weak*.txt")
+                    allFiles = glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
         else:
             if labels == 'normal':
-                allFiles = glob.glob(dirs + r"\State_Amplitude_t15*.txt")
+                allFiles = glob.glob(dirs + r"/State_Amplitude_t15*.txt")
             elif labels == 'large':
-                allFiles = glob.glob(dirs + r"\State_Amplitude_large_state_*.txt")
+                allFiles = glob.glob(dirs + r"/State_Amplitude_large_state_*.txt")
             elif labels == 'strong_weak':
-                allFiles = glob.glob(dirs + r"\State_Amplitude_state_strong_weak*.txt")
+                allFiles = glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
 
         if allFiles:
             for file_ in allFiles:
