@@ -219,7 +219,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
                             break
 
                     if np.sum(x) != 0:
-                        x = np.hstack((np.vstack(x).T, df[feats].values, df['label'].values[:, None]))
+                        x = np.hstack((np.vstack(x).T[10:], df[feats].values[10:], df['label'].values[:, None][10:]))
                         storage_tmp.append(x)
     t1 = time()
 
