@@ -16,6 +16,9 @@ from mpi4py import MPI
 
 # mpiexec -n 4 python loader_v3.py D:\Nicolas\samples_screens_t15\fichiers_screns_t15\gmr_72f11_ae_01@uas_chrimson_venus_x_0070\20141218_103213
 
+# mpiexec -np 2 singularity exec -H $HOME:/home/$USER -B /pasteur/projets/policy02/Larva-Screen/screens:/screens,/local/gensoft2/exe/openmpi tensorflow_gpu.img python /Larvae/loader_v3.py /screens/t15/GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s#n#n#n@100/20140818_130752 --save_dir=/results
+# mpiexec -np 2 python /Larvae/loader_v3.py /screens/t15/GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s#n#n#n@100/20140818_130752 --save_dir=/results
+
 def LWFT(x, xtype,tax,nf,sigma,tau,faxtype): # Layered Window Fourier Transform, according to Johnson (2013)
     # xtype = 0 or 1 for forward or inverse transform
     # x = signal
@@ -158,11 +161,10 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
             os.makedirs(save_path)
 
         # Initialize hdf5 file
-        tmp_shape = (0, len(feats)*(1 + nf) + 1)
-        hdf5_path_tmp = save_path + '/tmp.hdf5'
-        hdf5_tmp = tables.open_file(hdf5_path_tmp, mode='w')
-        storage_tmp = hdf5_tmp.create_earray(hdf5_tmp.root, 'tmp', tables.Float64Atom(), shape=tmp_shape)
-
+        x_shape = (0, len(feats)*(1 + nf) + 1)
+        hdf5_path = save_path + '/dataset.hdf5'
+        hdf5_file = tables.open_file(hdf5_path, mode='w')
+        storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
 
         # Initialize the list of lines from the argument passed as a string
         if lines:
@@ -207,7 +209,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
                 Ts = df['t'][1] - df['t'][0]
 
                 # We only consider times during and between the stimuli
-                df = df[((df['t'] > 25) & (df['t'] < 40)) | ((df['t'] > 40) & (df['t'] < 55))]
+                df = df[((df['t'] > 20) & (df['t'] < 45))]
 
                 if len(df.index) > 250:
                     n_larvae += 1
@@ -257,7 +259,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
         for i in range(len(allFiles)):
             recv_buffer = comm.recv(source=MPI.ANY_SOURCE)
             if not isinstance(recv_buffer, np.int32):
-                storage_tmp.append(recv_buffer)
+                storage.append(recv_buffer)
             else:
                 ended += 1
                 n_samples += recv_buffer
@@ -265,32 +267,12 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
                 break
         t1 = time()
 
-        hdf5_tmp.root.tmp[:].sort()
-
-        # Initialize hdf5 file
-        x_shape = (0, len(feats)*(1 + nf))
-        hdf5_path = save_path + '/dataset.hdf5'
-        hdf5_file = tables.open_file(hdf5_path, mode='w')
-        x_storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
-        y_storage = hdf5_file.create_earray(hdf5_file.root, 'y', tables.Int16Atom(), shape=(0,))
-
-        for i in range(len(labels)):
-            h = len(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :])
-            p = np.random.choice(np.arange(h), min(n_samples, h))
-            x_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, :-1])
-            y_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, -1])
-
-        print('len_df5', len(hdf5_file.root.x))
+        np.random.shuffle(hdf5_file.root.x[:])
 
         # Shuffle data
         len_dataset = len(hdf5_file.root.x[:])
+        
 
-        print('len_Dataset', len_dataset)
-        p2 = np.random.permutation(len_dataset)
-        hdf5_file.root.x[:] = hdf5_file.root.x[p2, :]
-        hdf5_file.root.y[:] = hdf5_file.root.y[p2]
-
-        hdf5_tmp.close()
         hdf5_file.close()
 
         print("***** Data successfully loaded from ", path, " for a total of ", n_samples, "samples *****")
@@ -319,7 +301,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='train',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path', help='path')
+    parser.add_argument('--save_dir', help='save dir')
 
     args = parser.parse_args()
 
-    load_transform(args.path, labels='normal')
+    load_transform(args.path, labels='normal', save_dir=args.save_dir)
