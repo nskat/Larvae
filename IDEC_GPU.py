@@ -173,13 +173,13 @@ class IDEC(object):
                     # At each epoch, train on the next batch
                     if index == 0:
                         if (index_update + 1) * self.update_batch > len_dataset:
-                            x = dataset.root.x[index_update * self.update_batch:]
-                            y = dataset.root.y[index_update * self.update_batch:].flatten()
+                            x = dataset.root.x[index_update * self.update_batch:, :-1]
+                            y = dataset.root.x[index_update * self.update_batch:, -1]
                             index_update = 0
 
                         else:
-                            x = dataset.root.x[index_update * self.update_batch: (index_update + 1) * self.update_batch]
-                            y = dataset.root.y[index_update * self.update_batch: (index_update + 1) * self.update_batch].flatten()
+                            x = dataset.root.x[index_update * self.update_batch: (index_update + 1) * self.update_batch, :-1]
+                            y = dataset.root.x[index_update * self.update_batch: (index_update + 1) * self.update_batch, -1]
                             index_update += 1
 
                 if ite % update_interval == 0:
