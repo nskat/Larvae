@@ -70,7 +70,7 @@ def LWFT(x, xtype,tax,nf,sigma,tau,faxtype): # Layered Window Fourier Transform,
     return y
 
 
-def load_transform(path, labels='normal', lines=None, save_dir=''):
+def load_transform(path, labels='normal', lines=None, save_dir='results'):
     # Helper function to load the timeseries from all files in subdirectories from PATH,
     # re-scale them, compute their Fourier transforms, and return them in a numpy array,
     # along with the associated labels
@@ -227,34 +227,34 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
 
     n_samples = np.asarray(list(count_labels.values())).min() * 100
 
-    # Initialize hdf5 file
-    x_shape = (0, len(feats)*(1 + nf))
-    hdf5_path = save_path + '/dataset.hdf5'
-    hdf5_file = tables.open_file(hdf5_path, mode='w')
-    x_storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
-    y_storage = hdf5_file.create_earray(hdf5_file.root, 'y', tables.Int16Atom(), shape=(0,))
-
-    for i in range(len(labels)):
-        h = len(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :])
-        p = np.random.choice(np.arange(h), min(n_samples, h))
-        x_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, :-1])
-        y_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, -1])
-
-    # Shuffle data
-    len_dataset = len(hdf5_file.root.x[:])
-    p2 = np.random.permutation(len_dataset)
-    hdf5_file.root.x[:] = hdf5_file.root.x[p2, :]
-    hdf5_file.root.y[:] = hdf5_file.root.y[p2]
-
+    # # Initialize hdf5 file
+    # x_shape = (0, len(feats)*(1 + nf))
+    # hdf5_path = save_path + '/dataset.hdf5'
+    # hdf5_file = tables.open_file(hdf5_path, mode='w')
+    # x_storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
+    # y_storage = hdf5_file.create_earray(hdf5_file.root, 'y', tables.Int16Atom(), shape=(0,))
+    #
+    # for i in range(len(labels)):
+    #     h = len(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :])
+    #     p = np.random.choice(np.arange(h), min(n_samples, h))
+    #     x_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, :-1])
+    #     y_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, -1])
+    #
+    # # Shuffle data
+    # len_dataset = len(hdf5_file.root.x[:])
+    # p2 = np.random.permutation(len_dataset)
+    # hdf5_file.root.x[:] = hdf5_file.root.x[p2, :]
+    # hdf5_file.root.y[:] = hdf5_file.root.y[p2]
+    #
     hdf5_tmp.close()
-    hdf5_file.close()
+    # hdf5_file.close()
 
     print("***** Data successfully loaded from ", path, " for a total of ", n_larvae, " larvae samples *****")
     print("***** Import time : ", time() - t0, " *****")
     print("***** Permutation time : ", time() - t1, " *****")
 
-    print('Data saved to', hdf5_path)
-    return len_dataset, hdf5_path
+    # print('Data saved to', hdf5_path)
+    # return len_dataset, hdf5_path
 
 
 def generate_data_ae(dataset, batch_size, len_dataset):

@@ -287,11 +287,12 @@ if __name__ == "__main__":
             print('Number of samples: ', len_dataset)
             dataset = tables.open_file(dataset_path, mode='r')
             if len_dataset < args.update_batch:
-                x = dataset.root.x[:]
-                y = dataset.root.y[:]
+                x = dataset.root.x[:, :-1]
+                y = dataset.root.x[:, -1]
             else:
-                x = dataset.root.x[:args.update_batch]
-                y = dataset.root.y[:args.update_batch]
+                x = dataset.root.x[:args.update_batch, :-1]
+                y = dataset.root.x[:args.update_batch, -1]
+
         else:
             print('You have to pass --data')
             exit()
@@ -309,18 +310,12 @@ if __name__ == "__main__":
                 dataset = tables.open_file(args.data, mode='r')
                 len_dataset = len(dataset.root.x[:])
                 print('Number of samples: ', len_dataset)
-                # if len_dataset < args.update_batch:
-                #     x = dataset.root.x[:]
-                #     y = dataset.root.y[:]
-                # else:
-                #     x = dataset.root.x[:args.update_batch]
-                #     y = dataset.root.y[:args.update_batch]
                 if len_dataset < args.update_batch:
                     x = dataset.root.x[:, :-1]
-                    y = dataset.root.y[:, -1]
+                    y = dataset.root.x[:, -1]
                 else:
                     x = dataset.root.x[:args.update_batch, :-1]
-                    y = dataset.root.y[:args.update_batch, -1]
+                    y = dataset.root.x[:args.update_batch, -1]
         else:
             print('You have to pass --data')
 
