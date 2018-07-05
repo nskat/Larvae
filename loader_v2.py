@@ -261,10 +261,10 @@ def generate_data_ae(dataset, batch_size, len_dataset):
     i = 0
     while True:
         if batch_size*(i+1) < len_dataset:
-            batch = dataset.root.x[i*batch_size:(i+1)*batch_size]
+            batch = dataset.root.x[i*batch_size:(i+1)*batch_size, :-1]
             i += 1
         else:
-            batch = dataset.root.x[i*batch_size:]
+            batch = dataset.root.x[i*batch_size:, :-1]
             i = 0
         yield (batch, batch)
 
