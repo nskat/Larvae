@@ -19,6 +19,10 @@ from mpi4py import MPI
 # mpiexec -np 2 singularity exec -H $HOME:/home/$USER -B /pasteur/projets/policy02/Larva-Screen/screens:/screens,/local/gensoft2/exe/openmpi tensorflow_gpu.img python /Larvae/loader_v3.py /screens/t15/GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s#n#n#n@100/20140818_130752 --save_dir=/results
 # mpiexec -np 2 python /Larvae/loader_v3.py /screens/t15/GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s#n#n#n@100/20140818_130752 --save_dir=/results
 
+# mpiexec -np 2 singularity exec -H $HOME:/home/$USER test.img python mpi_test.py
+
+
+
 def LWFT(x, xtype,tax,nf,sigma,tau,faxtype): # Layered Window Fourier Transform, according to Johnson (2013)
     # xtype = 0 or 1 for forward or inverse transform
     # x = signal
@@ -196,7 +200,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
             print('allFiles', allFiles.shape)
             split = np.array_split(allFiles, size - 1, axis=0)
 
-    else:  # other cores
+    elif rank != 0:  # other cores
         # Create variables on other cores
         split = None
 

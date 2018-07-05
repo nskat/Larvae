@@ -7,7 +7,8 @@ Based on the Keras implementation for Deep Embedded Clustering (DEC) algorithm b
 
 import numpy as np
 import keras.backend as K
-from keras.engine.topology import Layer, InputSpec
+from keras.engi
+ne.topology import Layer, InputSpec
 from keras.layers import Dense, Input
 from keras.models import Model
 
