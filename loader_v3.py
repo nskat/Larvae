@@ -262,7 +262,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
         n_samples = 0
         for i in range(len(allFiles)):
             recv_buffer = comm.recv(source=MPI.ANY_SOURCE)
-            if not isinstance(recv_buffer, np.int32):
+            if isinstance(recv_buffer, np.ndarray):
                 storage.append(recv_buffer)
             else:
                 ended += 1
