@@ -257,8 +257,9 @@ def load_transform(path, labels='normal', lines=None, save_dir='results'):
     # return len_dataset, hdf5_path
 
 
-def generate_data_ae(dataset, batch_size, len_dataset):
+def generate_data_ae(dataset, batch_size, len_dataset, n_gpus=1):
     i = 0
+    batch_size *= n_gpus
     while True:
         if batch_size*(i+1) < len_dataset:
             batch = dataset.root.x[i*batch_size:(i+1)*batch_size, :-1]
