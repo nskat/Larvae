@@ -36,6 +36,8 @@ import loader_v2
 
 class IDEC(object):
     def __init__(self,
+                 x,
+                 y,
                  dims,
                  n_clusters=10,
                  alpha=1.0,
@@ -43,10 +45,13 @@ class IDEC(object):
                  n_gpus=1,
                  init_clustering='kmeans',
                  update_batch=2000000,
+                 epochs=5,
                  init='glorot_uniform',
                  save_dir='/results'):
 
         super(IDEC, self).__init__()
+        self.x = x
+        self.y = y
         self.dims = dims
         self.input_dim = dims[0]
         self.n_stacks = len(self.dims) - 1
@@ -55,6 +60,7 @@ class IDEC(object):
         self.batch_size = batch_size*n_gpus
         self.n_gpus = n_gpus
         self.init_clustering = init_clustering
+        self.epochs = epochs
         self.update_batch = update_batch
         self.autoencoder, self.encoder = autoencoder(self.dims, init=init)
 
@@ -63,12 +69,12 @@ class IDEC(object):
         self.save_dir = save_dir
         self.pretrained = False
 
-    def initialize_model(self, ae_weights=None, x=None, epochs=5, gamma=0.1, optimizer='adam'):
+    def initialize_model(self, ae_weights=None, optimizer='adam'):
         if ae_weights is not None:
             self.autoencoder.load_weights(ae_weights)
             print('Pretrained AE weights are loaded successfully.')
         else:
-            self.pretrain(x, optimizer=optimizer, epochs=epochs, batch_size=self.batch_size)
+            self.pretrain(optimizer=optimizer)
             print('Autoencoder pretrained successfully')
 
         hidden = self.autoencoder.get_layer(name='encoder_%d' % (self.n_stacks - 1)).output
@@ -79,21 +85,25 @@ class IDEC(object):
 
         self.model = Model(inputs=self.autoencoder.get_layer(name='input').input,
                            outputs=[clustering_layer, self.autoencoder.get_layer('decoder_0').output])
+        # If the model is single GPU compile now, otherwise it will be done later
+        self.model.compile(loss={'clustering': 'kld', 'decoder_0': 'mse'},
+                           loss_weights=[args.gamma, 1],
+                           optimizer=optimizer)
 
-    def pretrain(self, x, optimizer='adam', epochs=200, batch_size=256):
+    def pretrain(self, optimizer='adam'):
         save_dir_pretraining = self.save_dir + '/results_pretraining'
         if not os.path.exists(save_dir_pretraining):
             os.makedirs(save_dir_pretraining)
         print('...Pretraining...')
         t1 = time()
 
-        if (self.n_gpus == 1):
+        if self.n_gpus == 1:
             self.autoencoder.compile(optimizer=optimizer, loss='mse')
-            self.autoencoder.fit(x, x, batch_size=batch_size, epochs=epochs)
+            self.autoencoder.fit(self.x, self.x, batch_size=self.batch_size, epochs=self.epochs)
 
         else:
-            self.multi_gpu_autoencoder.compile(optimizer=optimizer, loss='mse')
-            self.multi_gpu_autoencoder.fit(x, x, batch_size=batch_size, epochs=epochs)
+            self.multi_gpu_autoencoder.compile(optimizer=self.optimizer, loss='mse')
+            self.multi_gpu_autoencoder.fit(self.x, self.x, batch_size=self.batch_size, epochs=self.epochs)
 
         print('Pretraining time: ', time() - t1)
         self.autoencoder.save_weights(save_dir_pretraining + '/ae_weights.h5')
@@ -108,7 +118,8 @@ class IDEC(object):
         weight = q ** 2 / q.sum(0)
         return (weight.T / weight.sum(1)).T
 
-    def clustering(self, x, y=None,
+    def clustering(self,
+                   dataset,
                    tol=1e-3,
                    update_interval=140,
                    maxiter=2e4,
@@ -118,28 +129,27 @@ class IDEC(object):
         if not os.path.exists(save_dir_clustering):
             os.makedirs(save_dir_clustering)
         print('Update interval', update_interval)
-        save_interval = int(x.shape[0] / self.batch_size * 2)  # 2 epochs
-        # save_interval = 1
+        save_interval = int(self.x.shape[0] / self.batch_size * 2)  # 2 epochs
         print('Save interval', save_interval)
 
         # initialize cluster centers using k-means
         if self.init_clustering == 'kmeans':
             print('Initializing cluster centers with k-means.')
             kmeans = KMeans(n_clusters=self.n_clusters, n_init=20)
-            y_pred = kmeans.fit_predict(self.encoder.predict(x))
+            y_pred = kmeans.fit_predict(self.encoder.predict(self.x))
             y_pred_last = y_pred
             self.model.get_layer(name='clustering').set_weights([kmeans.cluster_centers_])
 
         elif self.init_clustering == 'GMM':
             print('Initializing cluster centers with GMM.')
             gmm = GaussianMixture(n_components=self.n_clusters, covariance_type='diag')
-            sample = self.encoder.predict(x)
+            sample = self.encoder.predict(self.x)
             gmm.fit(sample)
-            acc_0 = cluster_acc(y, gmm.predict(sample))
+            acc_0 = cluster_acc(self.y, gmm.predict(sample))
             weights_0 = [gmm.means_]
             for i in range(3):
                 gmm.fit(sample)
-                acc_0_new = cluster_acc(y, gmm.predict(sample))
+                acc_0_new = cluster_acc(self.y, gmm.predict(sample))
                 if acc_0_new > acc_0:
                     acc_0 = acc_0_new
                     weights_0 = [gmm.means_]
@@ -147,16 +157,12 @@ class IDEC(object):
             y_pred_last = y_pred
             self.model.get_layer(name='clustering').set_weights(weights_0)
 
-
-        if self.n_gpus == 1:
-            self.model.compile(loss={'clustering': 'kld', 'decoder_0': 'mse'},
-                               loss_weights=[args.gamma, 1],
-                               optimizer=optimizer)
-        else:
+        # Compile model if it has multiple GPUS
+        if self.n_gpus != 1:
             self.multi_model = multi_gpu_model(self.model, gpus=self.n_gpus)
             self.multi_model.compile(loss={'clustering': 'kld', 'decoder_0': 'mse'},
-                               loss_weights=[args.gamma, 1],
-                               optimizer=optimizer)
+                                     loss_weights=[args.gamma, 1],
+                                     optimizer=optimizer)
 
         # logging file
         if not os.path.exists(save_dir_clustering):
@@ -175,25 +181,23 @@ class IDEC(object):
                     # At each epoch, train on the next batch
                     if index == 0:
                         if (index_update + 1) * self.update_batch > len_dataset:
-                            x = dataset.root.x[index_update * self.update_batch:, :-1]
-                            y = dataset.root.x[index_update * self.update_batch:, -1]
+                            self.x = dataset.root.x[index_update * self.update_batch:, :-1]
+                            self.y = dataset.root.x[index_update * self.update_batch:, -1]
                             index_update = 0
 
                         else:
-                            x = dataset.root.x[index_update * self.update_batch: (index_update + 1) * self.update_batch, :-1]
-                            y = dataset.root.x[index_update * self.update_batch: (index_update + 1) * self.update_batch, -1]
+                            self.x = dataset.root.x[index_update * self.update_batch: (index_update + 1) * self.update_batch, :-1]
+                            self.y = dataset.root.x[index_update * self.update_batch: (index_update + 1) * self.update_batch, -1]
                             index_update += 1
 
                 if ite % update_interval == 0:
 
                     if self.n_gpus == 1:
-                        q, _ = self.model.predict(x, verbose=0)
+                        q, _ = self.model.predict(self.x, verbose=0)
                         p = self.target_distribution(q)  # update the auxiliary target distribution p
                     else:
-                        q, _ = self.multi_model.predict(x, verbose=0)
+                        q, _ = self.multi_model.predict(self.x, verbose=0)
                         p = self.target_distribution(q)  # update the auxiliary target distribution p
-
-
 
                     # evaluate the clustering performance
                     y_pred = q.argmax(1)
@@ -201,9 +205,9 @@ class IDEC(object):
 
                     y_pred_last = y_pred
                     if y is not None:
-                        acc = np.round(cluster_acc(y, y_pred), 5)
-                        nmi = np.round(metrics.normalized_mutual_info_score(y, y_pred), 5)
-                        ari = np.round(metrics.adjusted_rand_score(y, y_pred), 5)
+                        acc = np.round(cluster_acc(self.y, y_pred), 5)
+                        nmi = np.round(metrics.normalized_mutual_info_score(self.y, y_pred), 5)
+                        ari = np.round(metrics.adjusted_rand_score(self.y, y_pred), 5)
                         loss = np.round(loss, 5)
                         logdict = dict(iter=ite, acc=acc, nmi=nmi, ari=ari, L=loss[0], Lc=loss[1], Lr=loss[2])
                         logwriter.writerow(logdict)
@@ -220,23 +224,23 @@ class IDEC(object):
                     if self.n_gpus == 1:
                         if (index + 1) * self.batch_size > x.shape[0]:
 
-                            loss = self.model.train_on_batch(x=x[index * self.batch_size::],
-                                                             y=[p[index * self.batch_size::], x[index * self.batch_size::]])
+                            loss = self.model.train_on_batch(x=self.x[index * self.batch_size::],
+                                                             y=[p[index * self.batch_size::], self.x[index * self.batch_size::]])
                             index = 0
                         else:
-                            loss = self.model.train_on_batch(x=x[index * self.batch_size:(index + 1) * self.batch_size],
+                            loss = self.model.train_on_batch(x=self.x[index * self.batch_size:(index + 1) * self.batch_size],
                                                              y=[p[index * self.batch_size:(index + 1) * self.batch_size],
-                                                                x[index * self.batch_size:(index + 1) * self.batch_size]])
+                                                                self.x[index * self.batch_size:(index + 1) * self.batch_size]])
                     else:
                         if (index + 1) * self.batch_size > x.shape[0]:
 
-                            loss = self.multi_model.train_on_batch(x=x[index * self.batch_size::],
-                                                             y=[p[index * self.batch_size::], x[index * self.batch_size::]])
+                            loss = self.multi_model.train_on_batch(x=self.x[index * self.batch_size::],
+                                                                   y=[p[index * self.batch_size::], self.x[index * self.batch_size::]])
                             index = 0
                         else:
-                            loss = self.multi_model.train_on_batch(x=x[index * self.batch_size:(index + 1) * self.batch_size],
-                                                             y=[p[index * self.batch_size:(index + 1) * self.batch_size],
-                                                                x[index * self.batch_size:(index + 1) * self.batch_size]])
+                            loss = self.multi_model.train_on_batch(x=self.x[index * self.batch_size:(index + 1) * self.batch_size],
+                                                                   y=[p[index * self.batch_size:(index + 1) * self.batch_size],
+                                                                   self.x[index * self.batch_size:(index + 1) * self.batch_size]])
                     index += 1
 
                 # save intermediate model
@@ -342,15 +346,14 @@ if __name__ == "__main__":
 
     # prepare the IDEC model
     optimizer = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.5, amsgrad=False)
-    idec = IDEC(dims=[x.shape[-1], 500, 500, 2000, args.latent_dim], n_clusters=args.n_clusters,
+    idec = IDEC(x, y, dims=[x.shape[-1], 500, 500, 2000, args.latent_dim], n_clusters=args.n_clusters,
                 batch_size=args.batch_size, n_gpus=args.n_gpus,
-                init_clustering=args.init, update_batch=args.update_batch, save_dir=args.save_dir)
-    idec.initialize_model(ae_weights=args.ae_weights, x=x, epochs=args.epochs, gamma=args.gamma,
+                init_clustering=args.init, update_batch=args.update_batch, epochs=args.epochs, save_dir=args.save_dir)
+    idec.initialize_model(ae_weights=args.ae_weights, gamma=args.gamma,
                           optimizer=optimizer)
-#    plot_model(idec.model, to_file='idec_model.png', show_shapes=True)
     idec.model.summary()
 
     # begin clustering, time not include pretraining part.
     t0 = time()
-    y_pred = idec.clustering(x, y=y, tol=args.tol, maxiter=args.maxiter,
+    y_pred = idec.clustering(dataset, tol=args.tol, maxiter=args.maxiter,
                              update_interval=args.update_interval, optimizer=optimizer)
