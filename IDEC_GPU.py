@@ -125,7 +125,7 @@ class IDEC(object):
                    maxiter=2e4,
                    optimizer='adam'):
 
-        save_dir_clustering = self.save_dir + '/results_clustering'
+        save_dir_clustering = self.save_dir + '/results_clustering/'
         if not os.path.exists(save_dir_clustering):
             os.makedirs(save_dir_clustering)
         print('Update interval', update_interval)
