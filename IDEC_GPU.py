@@ -125,7 +125,7 @@ class IDEC(object):
                    maxiter=2e4,
                    optimizer='adam'):
 
-        save_dir_clustering = self.save_dir + '\Results_clustering'
+        save_dir_clustering = self.save_dir + '/results_clustering/'
         if not os.path.exists(save_dir_clustering):
             os.makedirs(save_dir_clustering)
         print('Update interval', update_interval)
@@ -167,7 +167,7 @@ class IDEC(object):
         # logging file
         if not os.path.exists(save_dir_clustering):
             os.makedirs(save_dir_clustering)
-        with open(save_dir_clustering + '\idec_log.csv', 'w') as logfile:
+        with open(save_dir_clustering + '/idec_log.csv', 'w') as logfile:
             logwriter = csv.DictWriter(logfile, fieldnames=['iter', 'acc', 'nmi', 'ari', 'L', 'Lc', 'Lr'])
             logwriter.writeheader()
 
@@ -246,15 +246,15 @@ class IDEC(object):
                 # save intermediate model
                 if ite % save_interval == 0:
                     # save IDEC model checkpoints
-                    print('saving model to:', save_dir_clustering + '\IDEC_model_' + str(ite) + '.h5')
-                    self.model.save_weights(save_dir_clustering + '\IDEC_model_' + str(ite) + '.h5')
+                    print('saving model to:', save_dir_clustering + '/IDEC_model_' + str(ite) + '.h5')
+                    self.model.save_weights(save_dir_clustering + '/IDEC_model_' + str(ite) + '.h5')
 
                 ite += 1
 
         # save the trained model
         logfile.close()
-        print('saving model to:', save_dir_clustering + '\IDEC_model_final.h5')
-        self.model.save_weights(save_dir_clustering + '\IDEC_model_final.h5')
+        print('saving model to:', save_dir_clustering + '/IDEC_model_final.h5')
+        self.model.save_weights(save_dir_clustering + '/IDEC_model_final.h5')
 
         return y_pred
 
@@ -349,8 +349,7 @@ if __name__ == "__main__":
     idec = IDEC(x, y, dims=[x.shape[-1], 500, 500, 2000, args.latent_dim], n_clusters=args.n_clusters,
                 batch_size=args.batch_size, n_gpus=args.n_gpus,
                 init_clustering=args.init, update_batch=args.update_batch, epochs=args.epochs, save_dir=args.save_dir)
-    idec.initialize_model(ae_weights=args.ae_weights, gamma=args.gamma,
-                          optimizer=optimizer)
+    idec.initialize_model(ae_weights=args.ae_weights, optimizer=optimizer)
     idec.model.summary()
 
     # begin clustering, time not include pretraining part.
