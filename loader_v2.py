@@ -12,6 +12,7 @@ from math import pi
 from time import time
 import traceback
 import tables
+from progress.bar import Bar
 
 def LWFT(x, xtype,tax,nf,sigma,tau,faxtype): # Layered Window Fourier Transform, according to Johnson (2013)
     # xtype = 0 or 1 for forward or inverse transform
@@ -70,7 +71,7 @@ def LWFT(x, xtype,tax,nf,sigma,tau,faxtype): # Layered Window Fourier Transform,
     return y
 
 
-def load_transform(path, labels='normal', lines=None, save_dir='results'):
+def load_transform(path, labels='normal', lines=None, save_dir='', batch_size=100):
     # Helper function to load the timeseries from all files in subdirectories from PATH,
     # re-scale them, compute their Fourier transforms, and return them in a numpy array,
     # along with the associated labels
@@ -141,10 +142,11 @@ def load_transform(path, labels='normal', lines=None, save_dir='results'):
         os.makedirs(save_path)
 
     # Initialize hdf5 file
-    tmp_shape = (0, len(feats)*(1 + nf) + 1)
-    hdf5_path_tmp = save_path + '/tmp.hdf5'
-    hdf5_tmp = tables.open_file(hdf5_path_tmp, mode='w')
-    storage_tmp = hdf5_tmp.create_earray(hdf5_tmp.root, 'tmp', tables.Float64Atom(), shape=tmp_shape)
+    x_shape = (0, len(feats) * (1 + nf) + 1)
+    hdf5_path = save_path + '/dataset.hdf5'
+    hdf5_file = tables.open_file(hdf5_path, mode='w')
+    storage = hdf5_file.create_earray(hdf5_file.root, 'tmp', tables.Float64Atom(), shape=x_shape)
+    x_storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
 
     # Counters
     n_larvae = 0
@@ -156,6 +158,7 @@ def load_transform(path, labels='normal', lines=None, save_dir='results'):
         allFiles = None
 
     # Browse sub folders looking for data
+    bar = Bar('Loading files', max=len(list(os.walk(path))))
     for dirs, _, _ in os.walk(path):
         if lines:
             if any(s in dirs for s in lines):
@@ -174,12 +177,12 @@ def load_transform(path, labels='normal', lines=None, save_dir='results'):
                 allFiles = glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
 
         if allFiles:
-            for file_ in allFiles:
+            for i, file_ in enumerate(allFiles):
                 df = pd.read_csv(file_, sep='\t', header=None, names=names)
                 Ts = df['t'][1] - df['t'][0]
 
                 # We only consider times during and between the stimuli
-                df = df[((df['t'] > 25) & (df['t'] < 95))]
+                df = df[((df['t'] > 20) & (df['t'] < 45))]
 
                 if len(df.index) > 250:
                     n_larvae += 1
@@ -216,58 +219,56 @@ def load_transform(path, labels='normal', lines=None, save_dir='results'):
                             x.append(LWFT(sig, xtype, tax, nf, sigma, tau, faxtype))
                         # If we can't compute the LWFT for this column, go to the next timeseries
                         except:
+                            bar.next()
                             break
 
                     if np.sum(x) != 0:
-                        x = np.hstack((np.vstack(x).T[10:], df[feats].values[10:], df['label'].values[:, None][10:]))
-                        storage_tmp.append(x)
+                        x = np.hstack((np.vstack(x).T, df[feats].values, df['label'].values[:, None]))
+                        storage.append(x)
+
+            bar.next()
+    bar.finish()
     t1 = time()
 
-    hdf5_tmp.root.tmp[:].sort()
+    np.random.shuffle(hdf5_file.root.tmp[:])
 
-    n_samples = np.asarray(list(count_labels.values())).min() * 100
+    num_max_batches = int(len(hdf5_file.root.tmp[:])/batch_size)
+    x_storage.append(hdf5_file.root.tmp[:num_max_batches * batch_size])
+    hdf5_file.root.tmp.remove()
 
-    # # Initialize hdf5 file
-    # x_shape = (0, len(feats)*(1 + nf))
-    # hdf5_path = save_path + '/dataset.hdf5'
-    # hdf5_file = tables.open_file(hdf5_path, mode='w')
-    # x_storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
-    # y_storage = hdf5_file.create_earray(hdf5_file.root, 'y', tables.Int16Atom(), shape=(0,))
-    #
-    # for i in range(len(labels)):
-    #     h = len(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :])
-    #     p = np.random.choice(np.arange(h), min(n_samples, h))
-    #     x_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, :-1])
-    #     y_storage.append(hdf5_tmp.root.tmp[np.where(hdf5_tmp.root.tmp[:, -1] == i)[0], :][p, -1])
-    #
-    # # Shuffle data
-    # len_dataset = len(hdf5_file.root.x[:])
-    # p2 = np.random.permutation(len_dataset)
-    # hdf5_file.root.x[:] = hdf5_file.root.x[p2, :]
-    # hdf5_file.root.y[:] = hdf5_file.root.y[p2]
-    #
-    hdf5_tmp.close()
-    # hdf5_file.close()
+    # Shuffle data
+    len_dataset = len(hdf5_file.root.x[:])
+
+    hdf5_file.close()
 
     print("***** Data successfully loaded from ", path, " for a total of ", n_larvae, " larvae samples *****")
     print("***** Import time : ", time() - t0, " *****")
     print("***** Permutation time : ", time() - t1, " *****")
 
-    # print('Data saved to', hdf5_path)
-    # return len_dataset, hdf5_path
+    print('Data saved to', hdf5_path)
+    return len_dataset, hdf5_path
 
 
-def generate_data_ae(dataset, batch_size, len_dataset, n_gpus=1):
+def generate_data_ae(dataset, batch_size, len_dataset):
     i = 0
-    batch_size *= n_gpus
     while True:
+        print(i)
         if batch_size*(i+1) < len_dataset:
-            batch = dataset.root.x[i*batch_size:(i+1)*batch_size, :-1]
+            batch = dataset.root.x[i*batch_size:(i+1)*batch_size]
             i += 1
         else:
-            batch = dataset.root.x[i*batch_size:, :-1]
+            batch = dataset.root.x[i*batch_size:]
             i = 0
-        yield (batch, batch)
+        yield batch
+
+
+def generate_batch(dataset, len_dataset, i, batch_size):
+    num_max_batches = int(len_dataset/batch_size)
+    if (((i + 1) % num_max_batches) < num_max_batches) & (((i + 1) % num_max_batches) > 0):
+        batch = dataset.root.x[(i % num_max_batches)*batch_size: ((i+1) % num_max_batches)*batch_size, :-1]
+    else:
+        batch = dataset.root.x[(i % num_max_batches)*batch_size:, :-1]
+    return batch
 
 
 if __name__ == "__main__":
