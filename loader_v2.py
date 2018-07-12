@@ -71,7 +71,7 @@ def LWFT(x, xtype,tax,nf,sigma,tau,faxtype): # Layered Window Fourier Transform,
     return y
 
 
-def load_transform(path, labels='normal', lines=None, save_dir='', batch_size=100):
+def load_transform(path, labels='normal', lines=None, save_dir=''):
     # Helper function to load the timeseries from all files in subdirectories from PATH,
     # re-scale them, compute their Fourier transforms, and return them in a numpy array,
     # along with the associated labels
@@ -145,8 +145,7 @@ def load_transform(path, labels='normal', lines=None, save_dir='', batch_size=10
     x_shape = (0, len(feats) * (1 + nf) + 1)
     hdf5_path = save_path + '/dataset.hdf5'
     hdf5_file = tables.open_file(hdf5_path, mode='w')
-    storage = hdf5_file.create_earray(hdf5_file.root, 'tmp', tables.Float64Atom(), shape=x_shape)
-    x_storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
+    storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
 
     # Counters
     n_larvae = 0
@@ -230,11 +229,7 @@ def load_transform(path, labels='normal', lines=None, save_dir='', batch_size=10
     bar.finish()
     t1 = time()
 
-    np.random.shuffle(hdf5_file.root.tmp[:])
-
-    num_max_batches = int(len(hdf5_file.root.tmp[:])/batch_size)
-    x_storage.append(hdf5_file.root.tmp[:num_max_batches * batch_size])
-    hdf5_file.root.tmp.remove()
+    np.random.shuffle(hdf5_file.root.x[:])
 
     # Shuffle data
     len_dataset = len(hdf5_file.root.x[:])
@@ -277,6 +272,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='train',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path', help='path')
+    parser.add_argument('--save_dir')
     parser.add_argument('--lines', help='lines')
 
     args = parser.parse_args()
