@@ -279,4 +279,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    load_transform(args.path, labels='normal', lines=args.lines)
+    load_transform(args.path, labels='normal', lines=args.lines, save_dir=args.save_dir)
