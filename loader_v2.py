@@ -146,7 +146,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
     hdf5_path = save_path + '/dataset.hdf5'
     hdf5_file = tables.open_file(hdf5_path, mode='w')
     storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
-
+    hdf5_file.close()
     # Counters
     n_larvae = 0
     count_labels = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
@@ -176,6 +176,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
                 allFiles = glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
 
         if allFiles:
+            hdf5_file = tables.open_file(hdf5_path, mode='r+')
             for i, file_ in enumerate(allFiles):
                 df = pd.read_csv(file_, sep='\t', header=None, names=names)
                 Ts = df['t'][1] - df['t'][0]
@@ -223,12 +224,13 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
 
                     if np.sum(x) != 0:
                         x = np.hstack((np.vstack(x).T, df[feats].values, df['label'].values[:, None]))
-                        storage.append(x)
-
+                        hdf5_file.root.x.append(x)
+            hdf5_file.close()
             bar.next()
     bar.finish()
     t1 = time()
 
+    hdf5_file = tables.open_file(hdf5_path, mode='r+')
     np.random.shuffle(hdf5_file.root.x[:])
 
     # Shuffle data
