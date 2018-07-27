@@ -18,7 +18,7 @@ from time import time
 import numpy as np
 from keras.models import Model
 from keras.optimizers import SGD, Adam
-from keras.utils.vis_utils import plot_model
+import keras
 from keras.utils import multi_gpu_model
 import csv
 import os
@@ -28,16 +28,16 @@ from sklearn import metrics
 from sklearn.mixture import GaussianMixture
 import tables
 from DEC import cluster_acc, ClusteringLayer, autoencoder
-import loader_v2
+import loader
 
-# python /mnt/Larvae/IDEC_GPU.py --data=/pasteur/projets/policy02/Larva-Screen/screens/t15 --lines=gmr_72f11_ae_01@uas_chrimson_venus_x_0070\20141218_103213 --save_dir=/pasteur/homes/nskatchk/test --n_gpus=8
-
-# python Larvae/IDEC_GPU.py --dataset=custom --data=/home/dgxuser/Nicolas/data/dataset.hdf5 --ae_weights=/home/dgxuser/Nicolas/results_pretraining/ae_weights.h5 --save_dir=/home/dgxuser/Nicolas
-
+# singularity exec -H $HOME:/home/$USER tensorflow_gpu.img/ python /Larvae/IDEC_GPU.py --dataset=custom --data=/Larvae/data/dataset
+# srun -pgpu --qos=gpu --gres=gpu:teslaP100:1 --mem=0 singularity exec --writable --nv -H $HOME:/home/$USER tensorflow_gpu.img/ python /Larvae/IDEC_GPU.py --dataset=custom --data=/Larvae/data/dataset_GMR_72F11.hdf5 --n_clusters=4 --maxiter=200000 --update_interval=500 --save_dir=/Larvae/results_GMR_72F11_4_clusters --epochs=100
 class IDEC(object):
     def __init__(self,
                  x,
                  y,
+                 dataset,
+                 len_dataset,
                  dims,
                  n_clusters=10,
                  alpha=1.0,
@@ -52,6 +52,8 @@ class IDEC(object):
         super(IDEC, self).__init__()
         self.x = x
         self.y = y
+        self.dataset = dataset
+        self.len_dataset = len_dataset
         self.dims = dims
         self.input_dim = dims[0]
         self.n_stacks = len(self.dims) - 1
@@ -69,10 +71,25 @@ class IDEC(object):
         self.save_dir = save_dir
         self.pretrained = False
 
-    def initialize_model(self, ae_weights=None, optimizer='adam'):
+    def initialize_model(self, ae_weights=None, idec_weights=None, optimizer='adam'):
         if ae_weights is not None:
             self.autoencoder.load_weights(ae_weights)
             print('Pretrained AE weights are loaded successfully.')
+        elif idec_weights is not None:
+            print('Loading existing model from ', idec_weights)
+            hidden = self.autoencoder.get_layer(name='encoder_%d' % (self.n_stacks - 1)).output
+            self.encoder = Model(inputs=self.autoencoder.get_layer(name='input').input, outputs=hidden)
+
+            # prepare IDEC model
+            clustering_layer = ClusteringLayer(self.n_clusters, name='clustering')(hidden)
+
+            self.model = Model(inputs=self.autoencoder.get_layer(name='input').input,
+                               outputs=[clustering_layer, self.autoencoder.get_layer('decoder_0').output])
+            self.model.compile(loss={'clustering': 'kld', 'decoder_0': 'mse'},
+                               loss_weights=[args.gamma, 1],
+                               optimizer=optimizer)
+            self.model.load_weights(idec_weights)
+            return
         else:
             self.pretrain(optimizer=optimizer)
             print('Autoencoder pretrained successfully')
@@ -96,10 +113,16 @@ class IDEC(object):
             os.makedirs(save_dir_pretraining)
         print('...Pretraining...')
         t1 = time()
-
         if self.n_gpus == 1:
             self.autoencoder.compile(optimizer=optimizer, loss='mse')
-            self.autoencoder.fit(self.x, self.x, batch_size=self.batch_size, epochs=self.epochs)
+            if len_dataset < self.update_batch:
+                self.autoencoder.fit(self.x, self.x, batch_size=self.batch_size, epochs=self.epochs)
+            else:
+                steps = int(len_dataset/self.batch_size)
+                print(steps)
+                self.autoencoder.fit_generator(loader.generate_data_ae(self.dataset, self.batch_size,
+                                                                          self.len_dataset),
+                                               steps_per_epoch=steps, epochs=self.epochs)
 
         else:
             self.multi_gpu_autoencoder.compile(optimizer=self.optimizer, loss='mse')
@@ -129,7 +152,7 @@ class IDEC(object):
         if not os.path.exists(save_dir_clustering):
             os.makedirs(save_dir_clustering)
         print('Update interval', update_interval)
-        save_interval = int(self.x.shape[0] / self.batch_size * 2)  # 2 epochs
+        save_interval = int(self.x.shape[0] / self.batch_size * 10)  # 2 epochs
         print('Save interval', save_interval)
 
         # initialize cluster centers using k-means
@@ -156,6 +179,11 @@ class IDEC(object):
             y_pred = gmm.predict(sample)
             y_pred_last = y_pred
             self.model.get_layer(name='clustering').set_weights(weights_0)
+        else:
+            q, _ = self.model.predict(self.x, verbose=0)
+            y_pred = q.argmax(1)
+            y_pred_last = y_pred
+
 
         # Compile model if it has multiple GPUS
         if self.n_gpus != 1:
@@ -177,7 +205,7 @@ class IDEC(object):
 
             for ite in range(int(maxiter)):
                 # If the dataset cannot fit in memory, do the training on batches successively
-                if len_dataset > self.update_batch:
+                if self.len_dataset > self.update_batch:
                     # At each epoch, train on the next batch
                     if index == 0:
                         if (index_update + 1) * self.update_batch > len_dataset:
@@ -214,7 +242,7 @@ class IDEC(object):
                         print('Iter', ite, ': Acc', acc, ', nmi', nmi, ', ari', ari, '; loss=', loss)
 
                     # # check stop criterion
-                    if ite > 0 and delta_label == 0:
+                    if (ite > 0) and (delta_label < tol):
                         print('delta_label ', delta_label, '< tol ', tol)
                         print('Reached tolerance threshold. Stopping training.')
                         logfile.close()
@@ -281,10 +309,12 @@ if __name__ == "__main__":
     parser.add_argument('--gamma', default=0.1, type=float,
                         help='Coefficient of the clustering loss')
     parser.add_argument('--update_interval', default=140, type=int)
-    parser.add_argument('--update_batch', default=2000000, type=int,
+    parser.add_argument('--update_batch', default=1000000, type=int,
                         help='Quantity of data that can fit into memory, typically several million rows')
-    parser.add_argument('--tol', default=0.001, type=float)
+    parser.add_argument('--tol', default=0.0001, type=float)
     parser.add_argument('--ae_weights', default=None)
+    parser.add_argument('--idec_weights', default=None,
+                        help='Path to model to continue training')
     parser.add_argument('--labels', default='normal', choices=['normal', 'large', 'strong_weak'],
                         help='Types of label selected')
     parser.add_argument('--save_dir', default='/results')
@@ -294,7 +324,7 @@ if __name__ == "__main__":
                         help='Dimension of the latent space')
     parser.add_argument('--n_gpus', default=1, type=int,
                         help='Number of GPUs to use for model training')
-    parser.add_argument('--init', default='GMM', choices=['kmeans', 'GMM'],
+    parser.add_argument('--init', default='GMM', choices=['kmeans', 'GMM', 'None'],
                         help='Initialization of clusters centers')
 
     args = parser.parse_args()
@@ -308,7 +338,7 @@ if __name__ == "__main__":
     if not args.dataset:
         print('Transforming and loading data from: ' + args.data)
         if args.data is not None:
-            len_dataset, dataset_path = loader_v2.load_transform(args.data, args.labels, args.lines, args.save_dir)
+            len_dataset, dataset_path = loader.load_transform(args.data, args.labels, args.lines, args.save_dir)
             print('Number of samples: ', len_dataset)
             dataset = tables.open_file(dataset_path, mode='r')
             if len_dataset < args.update_batch:
@@ -345,11 +375,11 @@ if __name__ == "__main__":
             print('You have to pass --data')
 
     # prepare the IDEC model
-    optimizer = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.5, amsgrad=False)
-    idec = IDEC(x, y, dims=[x.shape[-1], 500, 500, 2000, args.latent_dim], n_clusters=args.n_clusters,
+    optimizer = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    idec = IDEC(x, y, dataset, len_dataset, dims=[x.shape[-1], 500, 500, 2000, args.latent_dim], n_clusters=args.n_clusters,
                 batch_size=args.batch_size, n_gpus=args.n_gpus,
                 init_clustering=args.init, update_batch=args.update_batch, epochs=args.epochs, save_dir=args.save_dir)
-    idec.initialize_model(ae_weights=args.ae_weights, optimizer=optimizer)
+    idec.initialize_model(ae_weights=args.ae_weights, idec_weights=args.idec_weights, optimizer=optimizer)
     idec.model.summary()
 
     # begin clustering, time not include pretraining part.

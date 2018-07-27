@@ -14,6 +14,8 @@ import traceback
 import tables
 from progress.bar import Bar
 
+#singularity exec --writable -H $HOME:/home/$USER -B /pasteur/projets/policy02/Larva-Screen/screens/:/screen tensorflow_gpu.img/ python /Larvae/loader_v2.py /screen --save_dir=/Larvae --lines=FCF_attP2_1500062@UAS_TNT_2_0003
+
 def LWFT(x, xtype,tax,nf,sigma,tau,faxtype): # Layered Window Fourier Transform, according to Johnson (2013)
     # xtype = 0 or 1 for forward or inverse transform
     # x = signal
@@ -91,6 +93,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
                  'motion_velocity_norm_smooth_5', 'head_velocity_norm_smooth_5', 'tail_velocity_norm_smooth_5',
                  'As_smooth_5', 'prod_scal_1', 'prod_scal_2', 'motion_to_u_tail_head_smooth_5',
                  'motion_to_v_tail_head_smooth_5']
+
         labels_ = ['crawl', 'bend', 'stop', 'head retraction', 'back crawl', 'roll']
 
     elif labels == 'large':
@@ -121,15 +124,33 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
                    'head retraction weak', 'head retraction strong', 'back crawl weak','back crawl strong',
                    'roll weak','roll strong']
 
+    # feats = ['larva_length_smooth_5', 'larva_length_deriv_smooth_5', 'S_smooth_5', 'S_deriv_smooth_5',
+    #          'eig_smooth_5', 'eig_deriv_smooth_5', 'angle_upper_lower_smooth_5', 'angle_upper_lower_deriv_smooth_5',
+    #          'angle_downer_upper_smooth_5', 'angle_downer_upper_deriv_smooth_5', 'd_eff_head_norm_smooth_5',
+    #          'd_eff_head_norm_deriv_smooth_5','d_eff_tail_norm_smooth_5', 'd_eff_tail_norm_deriv_smooth_5',
+    #          'motion_velocity_norm_smooth_5', 'head_velocity_norm_smooth_5', 'tail_velocity_norm_smooth_5', 'As_smooth_5',
+    #          'prod_scal_1', 'prod_scal_2', 'motion_to_u_tail_head_smooth_5', 'motion_to_v_tail_head_smooth_5']
+    # feats = ['larva_length_smooth_5', 'larva_length_deriv_smooth_5', 'S_smooth_5', 'S_deriv_smooth_5',
+    #          'eig_smooth_5', 'eig_deriv_smooth_5', 'angle_upper_lower_smooth_5', 'angle_upper_lower_deriv_smooth_5',
+    #          'angle_downer_upper_smooth_5', 'angle_downer_upper_deriv_smooth_5', 'd_eff_head_norm_smooth_5',
+    #          'd_eff_head_norm_deriv_smooth_5','d_eff_tail_norm_smooth_5', 'd_eff_tail_norm_deriv_smooth_5',
+    #          'motion_velocity_norm_smooth_5', 'As_smooth_5', 'prod_scal_1', 'prod_scal_2',
+    #          'motion_to_u_tail_head_smooth_5', 'motion_to_v_tail_head_smooth_5']
+    # feats = ['larva_length_smooth_5', 'larva_length_deriv_smooth_5', 'S_smooth_5', 'S_deriv_smooth_5',
+    #          'eig_smooth_5', 'eig_deriv_smooth_5', 'angle_upper_lower_smooth_5', 'angle_upper_lower_deriv_smooth_5',
+    #          'angle_downer_upper_smooth_5', 'angle_downer_upper_deriv_smooth_5', 'd_eff_head_norm_smooth_5',
+    #          'd_eff_head_norm_deriv_smooth_5','d_eff_tail_norm_smooth_5', 'd_eff_tail_norm_deriv_smooth_5',
+    #          'motion_velocity_norm_smooth_5', 'head_velocity_norm_smooth_5', 'tail_velocity_norm_smooth_5',
+    #          'As_smooth_5', 'prod_scal_1', 'prod_scal_2']
     feats = ['larva_length_smooth_5', 'larva_length_deriv_smooth_5', 'S_smooth_5', 'S_deriv_smooth_5',
              'eig_smooth_5', 'eig_deriv_smooth_5', 'angle_upper_lower_smooth_5', 'angle_upper_lower_deriv_smooth_5',
              'angle_downer_upper_smooth_5', 'angle_downer_upper_deriv_smooth_5', 'd_eff_head_norm_smooth_5',
              'd_eff_head_norm_deriv_smooth_5','d_eff_tail_norm_smooth_5', 'd_eff_tail_norm_deriv_smooth_5',
-             'motion_velocity_norm_smooth_5', 'head_velocity_norm_smooth_5', 'tail_velocity_norm_smooth_5', 'As_smooth_5',
-             'prod_scal_1', 'prod_scal_2', 'motion_to_u_tail_head_smooth_5', 'motion_to_v_tail_head_smooth_5']
+             'motion_velocity_norm_smooth_5', 'As_smooth_5', 'prod_scal_1', 'prod_scal_2']
+
 
     angular_der = ['S_deriv_smooth_5', 'angle_upper_lower_deriv_smooth_5',
-                   'angle_downer_upper_deriv_smooth_5']
+                   'angle_downer_upper_deriv_smooth_5', 'larva_length_deriv_smooth_5']
 
     # LWFT parameters
     xtype = 1  # forward transform
@@ -143,7 +164,7 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
 
     # Initialize hdf5 file
     x_shape = (0, len(feats) * (1 + nf) + 1)
-    hdf5_path = save_path + '/dataset.hdf5'
+    hdf5_path = save_path + '/dataset_' + lines + '.hdf5'
     hdf5_file = tables.open_file(hdf5_path, mode='w')
     storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
     hdf5_file.close()
@@ -154,79 +175,82 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
     # Initialize the list of lines from the argument passed as a string
     if lines:
         lines = [x.strip() for x in lines.split(',')]
-        allFiles = None
+        allFiles = []
 
     # Browse sub folders looking for data
-    bar = Bar('Loading files', max=len(list(os.walk(path))))
+
     for dirs, _, _ in os.walk(path):
         if lines:
             if any(s in dirs for s in lines):
                 if labels == 'normal':
-                    allFiles = glob.glob(dirs + r"/State_Amplitude_t15*.txt")
+                    allFiles += glob.glob(dirs + r"/State_Amplitude_t*.txt")
                 elif labels == 'large':
-                    allFiles = glob.glob(dirs + r"/State_Amplitude_large_state_*.txt")
+                    allFiles += glob.glob(dirs + r"/State_Amplitude_large_state_*.txt")
                 elif labels == 'strong_weak':
-                    allFiles = glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
+                    allFiles += glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
         else:
             if labels == 'normal':
-                allFiles = glob.glob(dirs + r"/State_Amplitude_t15*.txt")
+                allFiles += glob.glob(dirs + r"/State_Amplitude_t*.txt")
             elif labels == 'large':
-                allFiles = glob.glob(dirs + r"/State_Amplitude_large_state_*.txt")
+                allFiles += glob.glob(dirs + r"/State_Amplitude_large_state_*.txt")
             elif labels == 'strong_weak':
-                allFiles = glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
+                allFiles += glob.glob(dirs + r"/State_Amplitude_state_strong_weak*.txt")
+    if allFiles:
+        bar = Bar('Loading files', max=len(allFiles))
+        for i, file_ in enumerate(allFiles):
+            df = pd.read_csv(file_, sep='\t', header=None, names=names)
+            Ts = df['t'][1] - df['t'][0]
 
-        if allFiles:
-            hdf5_file = tables.open_file(hdf5_path, mode='r+')
-            for i, file_ in enumerate(allFiles):
-                df = pd.read_csv(file_, sep='\t', header=None, names=names)
-                Ts = df['t'][1] - df['t'][0]
+            # We only consider times during and between the stimuli
+            df = df[((df['t'] > 20) & (df['t'] < 50))]
+            if len(df.index) > 250:
+                n_larvae += 1
+                x = []
 
-                # We only consider times during and between the stimuli
-                df = df[((df['t'] > 20) & (df['t'] < 45))]
+                # If necessary, removes the imaginary parts
+                for col in feats:
+                    if df[col].dtype == object:
+                        df[col] = (df[col].str.split('+')).str[0]
+                        df[col] = pd.to_numeric((df[col].str.split('[0-9]-')).str[0])
 
-                if len(df.index) > 250:
-                    n_larvae += 1
-                    x = []
+                # Damps derivatives that become too large at some moments
+                df[angular_der] = np.tanh((df[angular_der]-df[angular_der].mean()) / (2*df[angular_der].var()))
 
-                    # If necessary, removes the imaginary parts
-                    for col in feats:
-                        if df[col].dtype == object:
-                            df[col] = (df[col].str.split('+')).str[0]
-                            df[col] = pd.to_numeric((df[col].str.split('[0-9]-')).str[0])
+                # Re-scale features
+                maxs = df[feats].max()
+                mins = df[feats].min()
+                df[feats] = (df[feats] - mins) / (maxs - mins)
 
-                    # Damps derivatives that become too large at some moments
-                    df[angular_der] = np.tanh((df[angular_der]-df[angular_der].mean()) / (2*df[angular_der].var()))
+                # Add 'label' column
+                for i, label in enumerate(labels_):
+                    df.loc[df[label] == 1, 'label'] = i
+                    count_labels[i] += len(df[df[label] == 1])
 
-                    # Re-scale features
-                    maxs = df[feats].max()
-                    mins = df[feats].min()
-                    df[feats] = (df[feats] - mins) / (maxs - mins)
+                # Preprocess each column in the timeseries
+                for col in feats:
+                    sig = df[col].values
+                    tax = np.arange(0, len(sig) * Ts, Ts)
+                    tax = tax[:len(sig)]
+                    taumax = min(5, int(tax[-1] / 2))
+                    tau = np.logspace(np.log10(2 * Ts), np.log10(taumax), 10)  # using 10 points on a logscale
 
-                    # Add 'label' column
-                    for i, label in enumerate(labels_):
-                        df.loc[df[label] == 1, 'label'] = i
-                        count_labels[i] += len(df[df[label] == 1])
+                    try:
+                        x.append(LWFT(sig, xtype, tax, nf, sigma, tau, faxtype)[:, 10:-10])
+                    # If we can't compute the LWFT for this column, go to the next timeseries
+                    except:
+                        bar.next()
+                        break
+                        bar.next()
 
-                    # Preprocess each column in the timeseries
-                    for col in feats:
-                        sig = df[col].values
-                        tax = np.arange(0, len(sig) * Ts, Ts)
-                        tax = tax[:len(sig)]
-                        taumax = min(5, int(tax[-1] / 2))
-                        tau = np.logspace(np.log10(2 * Ts), np.log10(taumax), 10)  # using 10 points on a logscale
+                if (np.sum(x) != 0) & (not np.isnan(x).any()) & (not np.isinf(x).any()):
+                    x = np.hstack((np.vstack(x).T, df[feats].values[10:-10], df['label'].values[:, None][10:-10]))
+                    hdf5_file = tables.open_file(hdf5_path, mode='r+')
+                    hdf5_file.root.x.append(x)
+                    hdf5_file.close()
+                bar.next()
+            else:
+                bar.next()
 
-                        try:
-                            x.append(LWFT(sig, xtype, tax, nf, sigma, tau, faxtype))
-                        # If we can't compute the LWFT for this column, go to the next timeseries
-                        except:
-                            bar.next()
-                            break
-
-                    if np.sum(x) != 0:
-                        x = np.hstack((np.vstack(x).T, df[feats].values, df['label'].values[:, None]))
-                        hdf5_file.root.x.append(x)
-            hdf5_file.close()
-            bar.next()
     bar.finish()
     t1 = time()
 
@@ -248,15 +272,24 @@ def load_transform(path, labels='normal', lines=None, save_dir=''):
 
 def generate_data_ae(dataset, batch_size, len_dataset):
     i = 0
+    num_max_batches = int(len_dataset / batch_size)
     while True:
-        print(i)
-        if batch_size*(i+1) < len_dataset:
-            batch = dataset.root.x[i*batch_size:(i+1)*batch_size]
-            i += 1
+        if (((i + 1) % num_max_batches) < num_max_batches) & (((i + 1) % num_max_batches) > 0):
+            batch = dataset.root.x[(i % num_max_batches) * batch_size: ((i + 1) % num_max_batches) * batch_size, :-1]
+            i +=1
         else:
-            batch = dataset.root.x[i*batch_size:]
+            batch = dataset.root.x[(i % num_max_batches) * batch_size:, :-1]
             i = 0
-        yield batch
+        # print(i, (i+1)*batch_size, len_dataset, len(batch))
+        #
+        #
+        # if batch_size*(i+1) < len_dataset:
+        #     batch = dataset.root.x[i*batch_size:(i+1)*batch_size, :-1]
+        #     i += 1
+        # else:
+        #     i = 0
+        #     batch = dataset.root.x[i*batch_size:(i+1)*batch_size, :-1]
+        yield (batch, batch)
 
 
 def generate_batch(dataset, len_dataset, i, batch_size):
