@@ -2,17 +2,10 @@
 .idea/
 __pycache__/
 
-# ignore data set
-
-# weights file
-/ae_weights/
-
-# ignore the results of running code 'results/'
-/results/
-
 # ignore others
 *.h5
 *.pyc
 *.hdf5
 *.npz
 *.csv
+*.ipynb
