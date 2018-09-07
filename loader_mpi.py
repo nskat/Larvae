@@ -81,7 +81,6 @@ def load_transform(path, lines=None, save_dir='', window=1, screen=''):
             lines = [x.strip() for x in lines.split(',')]
         else:
             raise FileExistsError
-        allFiles = []
 
         # Initialize the list of lines from the argument passed as a string
         if screen == 't15':
@@ -91,27 +90,21 @@ def load_transform(path, lines=None, save_dir='', window=1, screen=''):
         else:
             raise NotImplementedError
 
-        if lines:
-            lines = [x.strip() for x in lines.split(',')]
-        else:
-            raise NotImplementedError
+        # Browse sub folders looking for data
+        dirs = [r'/' + dir_ for dir_ in os.listdir(path) for line in lines if line in dir_]
+        allFiles_d = {key: [] for key in dirs}
+        allFiles = []
 
-            # Browse sub folders looking for data
-            dirs = [r'/' + dir_ for dir_ in os.listdir(path) for line in lines if line in dir_]
-            print(dirs)
-            allFiles_d = {key: [] for key in dirs}
-            allFiles = []
+        for dir_ in dirs:
+            for subdir, _, _ in os.walk(path + dir_):
+                allFiles_d[dir_] += glob.glob(subdir + r'/State_Amplitude_t*')
 
-            for dir_ in dirs:
-                for subdir, _, _ in os.walk(path + dir_):
-                    allFiles_d[dir_] += glob.glob(subdir + r'/State_Amplitude_t*')
+        print('Lines for which data has been found:', [dir_ for dir_ in dirs if allFiles_d[dir_]])
 
-            print('Lines for which data has been found:', [dir_ for dir_ in dirs if allFiles_d[dir_]])
-
-            # Balance dataset by picking the same number of larvae from each line
-            smallest_line_len = min([len(i) for i in allFiles_d.values()])
-            for dir_ in dirs:
-                allFiles += allFiles_d[dir_][:smallest_line_len]
+        # Balance dataset by picking the same number of larvae from each line
+        smallest_line_len = min([len(i) for i in allFiles_d.values()])
+        for dir_ in dirs:
+            allFiles += allFiles_d[dir_][:smallest_line_len]
 
         split = np.array_split(allFiles, size - 1, axis=0)
 
