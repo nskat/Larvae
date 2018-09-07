@@ -75,7 +75,6 @@ def load_transform(path, lines=None, save_dir='', window=1, screen=''):
         hdf5_path = save_path + '/dataset_' + lines + '.hdf5'
         hdf5_file = tables.open_file(hdf5_path, mode='w')
         storage = hdf5_file.create_earray(hdf5_file.root, 'x', tables.Float64Atom(), shape=x_shape)
-        hdf5_file.close()
 
     # Initialize the list of lines from the argument passed as a string
         if lines:
