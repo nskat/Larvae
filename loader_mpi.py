@@ -13,6 +13,7 @@ from time import time
 import traceback
 import tables
 from mpi4py import MPI
+from progress.bar import Bar
 
 # mpiexec -n 4 python loader_v3.py D:\Nicolas\samples_screens_t15\fichiers_screns_t15\gmr_72f11_ae_01@uas_chrimson_venus_x_0070\20141218_103213
 
@@ -139,7 +140,6 @@ def load_transform(path, lines=None, save_dir='', window=1, screen=''):
                             df[col] = (df[col].str.split('+')).str[0]
                             df[col] = pd.to_numeric((df[col].str.split('[0-9]-')).str[0])
                         except:
-                            bar.next()
                             break
 
                 # Re-scale features
@@ -161,18 +161,19 @@ def load_transform(path, lines=None, save_dir='', window=1, screen=''):
                                             df['label'][j]))[:, None].T)
                 x = np.vstack(x)
                 comm.send(x, 0, tag=1)   # send x to 0 to store in storage_tmp
-        comm.send(np.asarray(list(count_labels.values())).sum(), 0, tag=0)
+        comm.send(0, 0, tag=0)
 
     else:
+        # Loading bar
+        bar = Bar('Loading files', max=len(allFiles))
         ended = 0
-        n_samples = 0
         for i in range(len(allFiles)):
             recv_buffer = comm.recv(source=MPI.ANY_SOURCE)
             if isinstance(recv_buffer, np.ndarray):
                 storage.append(recv_buffer)
+                bar.next()
             else:
                 ended += 1
-                n_samples += recv_buffer
             if ended == size - 1:
                 break
         t1 = time()
@@ -183,7 +184,6 @@ def load_transform(path, lines=None, save_dir='', window=1, screen=''):
         len_dataset = len(hdf5_file.root.x[:])
         hdf5_file.close()
 
-        print("***** Data successfully loaded from ", path, " for a total of ", n_samples, "samples *****")
         print("***** Import time : ", time() - t0, " *****")
         print("***** Permutation time : ", time() - t1, " *****")
 
