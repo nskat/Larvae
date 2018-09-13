@@ -2,6 +2,8 @@
 This python file implements a routine to use to load larvae data, process it using a layered window Fourier transform
 and return the corresponding Fourier components in a Pandas DataFrame
 Does not load all files and keep then in memory, but loads them one after the other and saves them in an hdf5 file
+Usage:
+    mpiexec -np 4 python loader_mpi.py --path=/path/to/the/screen --save_dir=/path/to/save/dir --lines=line1,line2,...lineN --window=1 --screen=t15
 '''
 
 import numpy as np
@@ -12,13 +14,6 @@ from time import time
 import tables
 from mpi4py import MPI
 from progress.bar import Bar
-
-# mpiexec -n 4 python loader_v3.py D:\Nicolas\samples_screens_t15\fichiers_screns_t15\gmr_72f11_ae_01@uas_chrimson_venus_x_0070\20141218_103213
-
-# mpiexec -np 2 singularity exec -H $HOME:/home/$USER -B /pasteur/projets/policy02/Larva-Screen/screens:/screens,/local/gensoft2/exe/openmpi tensorflow_gpu.img python /Larvae/loader_v3.py /screens/t15/GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s#n#n#n@100/20140818_130752 --save_dir=/results
-# mpiexec -np 2 python /Larvae/loader_v3.py /screens/t15/GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s#n#n#n@100/20140818_130752 --save_dir=/results
-
-# mpiexec -np 2 singularity exec -H $HOME:/home/$USER test.img python mpi_test.py
 
 
 def load_transform(path, lines=None, save_dir='', window=1, screen='', batch_size=None):

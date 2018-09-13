@@ -1,3 +1,9 @@
+'''
+Visualize TRX file to visualize classification from VaDE model.
+Usage :
+    python visualize_classification_idec.py --path=path/to/trx/folder/ --n_clusters=6 --idec_weights=path/to/weights.h5 --window=1
+'''
+
 # Ugly hack to allow absolute import from the root folder
 # whatever its name is. Please forgive the heresy.
 if __name__ == "__main__" and __package__ is None:
@@ -293,6 +299,7 @@ def load_transform(path, window=1):
 
     print("***** Data successfully loaded from ", path, " for a total of ", n_larvae, " larvae samples *****")
     return data_features
+
 
 if __name__ == "__main__":
     import argparse

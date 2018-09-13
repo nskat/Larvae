@@ -2,6 +2,8 @@
 This python file implements a routine to use to load larvae data, process it using a layered window Fourier transform
 and return the corresponding Fourier components in a Pandas DataFrame
 Only kept for information, does not work as well as loader.py
+Usage:
+    python loader_lwft.py --path=/path/to/the/screen --features=all --save_dir=/path/to/save/dir --lines=line1,line2,...lineN --window=1 --screen=t15
 '''
 
 import numpy as np

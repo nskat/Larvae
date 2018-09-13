@@ -11,6 +11,7 @@ from keras.engine.topology import Layer, InputSpec
 from keras.layers import Dense, Input
 from keras.models import Model
 
+
 def cluster_acc(y_true, y_pred):
     """
     Calculate clustering accuracy. Require scikit-learn installed

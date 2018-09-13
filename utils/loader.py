@@ -2,6 +2,8 @@
 This python file implements a routine to use to load larvae data, process it using a layered window Fourier transform
 and return the corresponding Fourier components in a Pandas DataFrame
 Does not load all files and keep then in memory, but loads them one after the other and saves them in an hdf5 file
+Usage :
+    python loader.py --path=/path/to/the/screen --save_dir=/path/to/save/dir --lines=line1,line2,...lineN --window=1 --screen=t15
 '''
 
 import numpy as np
@@ -11,8 +13,6 @@ import glob
 from time import time
 import tables
 from progress.bar import Bar
-
-# singularity exec --writable -H $HOME:/home/$USER -B /pasteur/projets/policy02/Larva-Screen/screens/:/screen tensorflow_gpu.img/ python /Larvae/loader_v2.py /screen --save_dir=/Larvae/tests/window_input_1s_pos --lines=MZZ_R_3013849@UAS_Chrimson_Venus_X_0070 --window=0.5
 
 
 def load_transform(path, lines=None, save_dir='', window=1, screen='', batch_size=None):

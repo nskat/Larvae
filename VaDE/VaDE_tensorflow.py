@@ -1,11 +1,9 @@
 """
 Usage:
-    With no transformed data:
-        python VaDE_tensorflow.py --data=/path/to/data/ --n_clusters=x --epochs=200000  --save_dir=/path/to/save_dir --epochs_pretraining=100
     With data already transformed and stored in a hdf5 file:
-        python VaDE_tensorflow.py --data=/path/to/data.hdf5 --n_clusters=x --epochs=200000  --save_dir=/path/to/save_dir --epochs_pretraining=100
+        python VaDE_tensorflow.py --dataset=/path/to/data.hdf5 --n_clusters=x --epochs=200000  --save_dir=/path/to/save_dir --epochs_pretraining=100
     If you also have pretrained weights for the autoencoder:
-        python VaDE_tensorflow.py custom  --data=/path/to/data.hdf5 --n_clusters=x --epochs=200000  --save_dir=/path/to/save_dir --ae_weights=path/to/pretrained/ae.h5
+        python VaDE_tensorflow.py  --dataset=/path/to/data.hdf5 --n_clusters=x --epochs=200000  --save_dir=/path/to/save_dir --ae_weights=path/to/pretrained/ae.h5
 """
 
 # Ugly hack to allow absolute import from the root folder
@@ -34,8 +32,6 @@ from utils import loader
 import warnings
 warnings.filterwarnings("ignore")
 
-
-#python VaDE_tensorflow.py --data=D:\Nicolas\samples_screens_t15\fichiers_screns_t15\gmr_72f11_ae_01@uas_chrimson_venus_x_0070\20141218_103213 --epochs=5000 --epochs_pretrain=50
 
 # =====================================
 
