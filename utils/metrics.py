@@ -287,7 +287,7 @@ def get_probas(path='', idec_weights='', n_clusters=6, window=1, screen='t15', t
 
         for i in range(proba.shape[-1]):
             plt.plot(times, proba[:, i], color=cm(i))
-            plt.title('Probabilities ' + tag[1:] + ' ' + n_clusters + ' clusters')
+            plt.title('Probabilities ' + tag[1:] + ' ' + str(n_clusters) + ' clusters')
 
         ax2 = fig.add_axes([0.95, 0.12, 0.03, 0.7])
         cb2 = mpl.colorbar.ColorbarBase(ax2, cmap=cm,
@@ -398,14 +398,17 @@ if __name__ == "__main__":
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', help='path')
     parser.add_argument('--n_clusters', type=int)
-    parser.add_argument('--lines', help='lines')
+    parser.add_argument('--line',
+                        help='The lines should here include the experimental process '
+                             '(ex: GMR_72F11_AE_01@UAS_Chrimson_Venus_X_0070/r_LED100_30s2x15s30s) '
+                             'in order to remain coherent with the hit analysis.')
     parser.add_argument('--window', type=int)
     parser.add_argument('--screen')
     parser.add_argument('--idec_weights', default=None)
 
     args = parser.parse_args()
 
-    x, tag = load_transform(path=args.path, lines=args.lines, window=args.window, screen=args.screen)
+    x, tag = load_transform(path=args.path, lines=args.line, window=args.window, screen=args.screen)
     get_transitions(x=x, n_clusters=args.n_clusters, idec_weights=args.idec_weights,
                     screen=args.screen, window=args.window, path=args.path, tag=tag)
     get_distributions(x=x, n_clusters=args.n_clusters, idec_weights=args.idec_weights, screen=args.screen,

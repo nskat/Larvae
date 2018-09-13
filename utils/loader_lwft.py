@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='train',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('path', help='path')
+    parser.add_argument('--path', help='path')
     parser.add_argument('--save_dir')
     parser.add_argument('--lines', help='lines')
     parser.add_argument('--screen')

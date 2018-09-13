@@ -71,7 +71,7 @@ yum -y install git-core
 
  #installing for python 3 as well 
  
- 
+ mkdir /screen
  mkdir /pasteur
  mkdir -p /local/scratch
 

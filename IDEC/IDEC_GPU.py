@@ -5,15 +5,23 @@ Based on the implementation for Improved Deep Embedded Clustering by Xifeng Guo,
         Preservation. IJCAI 2017.
 
 Usage:
-    With no transformed data:
-        python IDEC_GPU.py --data=/path/to/data/ --n_clusters=x --maxiter=200000 --update_interval=500 --save_dir=/path/to/save_dir --epochs=100
-    With data already transformed and stored in a hdf5 file:
-        python IDEC_GPU.py --data=/path/to/data.hdf5 --n_clusters=x --maxiter=200000 --update_interval=500 --save_dir=/path/to/save_dir --epochs=100
+        With data already transformed and stored in a hdf5 file:
+        python IDEC_GPU.py --dataset=/path/to/data.hdf5 --n_clusters=x --maxiter=200000 --update_interval=500 --save_dir=/path/to/save_dir --epochs=100
     If you also have pretrained weights for the autoencoder:
         python IDEC_GPU.py custom  --data=/path/to/data.hdf5 --n_clusters=x --maxiter=200000 --update_interval=500 --save_dir=/path/to/save_dir --ae_weights=path/to/pretrained/ae.h5
     To resume training :
         python IDEC_GPU.py custom  --data=/path/to/data.hdf5 --n_clusters=x --maxiter=200000 --update_interval=500 --save_dir=/path/to/save_dir --idec_weights=path/to/weights.h5
 """
+
+# Ugly hack to allow absolute import from the root folder
+# whatever its name is. Please forgive the heresy.
+if __name__ == "__main__" and __package__ is None:
+    from sys import path
+    from os.path import dirname as dir
+
+    path.append(dir(path[0]))
+    __package__ = "examples"
+
 
 from time import time
 import numpy as np
@@ -271,8 +279,7 @@ if __name__ == "__main__":
     # setting the hyper parameters
     import argparse
 
-    parser = argparse.ArgumentParser(description='train',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description='Train a model to classify larvae data')
     parser.add_argument('--dataset', default=None,
                         help='Path to dataset')
     parser.add_argument('--n_clusters', default=6, type=int,

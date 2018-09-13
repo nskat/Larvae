@@ -17,10 +17,12 @@ export PATH="$PATH:/usr/local/openmpi/bin"
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/.openmpi/lib/"
 export PATH="$PATH:/home/$USER/openmpi/bin" >> /usr/local/.bashrc
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/openmpi/lib/" >> /usr/local/.bashrc
+mkdir /screen
 
 pip install keras
 pip install tables
-#pip install mpi4py
+pip install progress
+
 apt-get -y --force-yes install git-core
 apt-get -y --force-yes install apt-file 
 apt-file update

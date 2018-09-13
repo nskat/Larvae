@@ -15,7 +15,6 @@ import os
 import glob
 import numpy as np
 from keras.models import Model
-
 import warnings
 warnings.filterwarnings("ignore")
 import tables
