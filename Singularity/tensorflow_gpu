@@ -1,0 +1,26 @@
+BootStrap:docker
+From:tensorflow/tensorflow:1.7.1-gpu-py3
+
+
+%post
+apt-get update && apt-get install -y --no-install-recommends apt-utils
+apt-get --force-yes -y install wget
+apt-get install sudo
+wget https://download.open-mpi.org/release/open-mpi/v2.0/openmpi-2.0.4.tar.gz
+tar -xvf openmpi-*
+rm -rf openmpi-2.0.4.tar.gz
+cd openmpi-*
+./configure --prefix="/usr/local/openmpi"
+make
+sudo make install
+export PATH="$PATH:/usr/local/openmpi/bin"
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/.openmpi/lib/"
+export PATH="$PATH:/home/$USER/openmpi/bin" >> /usr/local/.bashrc
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/openmpi/lib/" >> /usr/local/.bashrc
+
+pip install keras
+pip install tables
+#pip install mpi4py
+apt-get -y --force-yes install git-core
+apt-get -y --force-yes install apt-file 
+apt-file update
